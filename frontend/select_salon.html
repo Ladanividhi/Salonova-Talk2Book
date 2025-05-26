@@ -1,0 +1,996 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Book Appointment - Salon Booking</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        body {
+            margin: 0;
+            padding: 90px 20px 20px 20px; /* Increased top padding to accommodate fixed navbar */
+            font-family: 'Poppins', sans-serif; /* Match the font from style.css */
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+        }
+
+        .voice-button {
+            display: block;
+            width: 200px;
+            margin: 20px auto;
+            padding: 15px;
+            background-color:  #c0664d;
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+
+        .voice-button:hover {
+            background-color:  #c0664d;
+        }
+
+        .voice-button.listening {
+            background-color: rgb(26, 144, 255);
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        .conversation-log {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 5px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .message {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+        }
+
+        .user-message {
+            background: #e3f2fd;
+            margin-left: 20px;
+        }
+
+        .assistant-message {
+            background: #f5f5f5;
+            margin-right: 20px;
+        }
+
+        #bookingForm {
+            display: none;
+            margin-top: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #666;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+
+        .status {
+            text-align: center;
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+            display: none;
+        }
+
+        .error {
+            background-color: #ffebee;
+            color: #c62828;
+        }
+
+        .success {
+            background-color: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        .back-button {
+            display: block;
+            width: 150px;
+            margin: 20px auto;
+            padding: 12px;
+            background-color: #c0664d; /* Same as submit button */
+            color: white; /* White text like submit button */
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            text-decoration: none;
+            text-align: center;
+            transition: background-color 0.3s;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .back-button:hover {
+            background-color: #d17a60; /* Same hover effect as submit button */
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+
+        .voice-button.speaking {
+            background-color:  #c0664d;
+            animation: pulse 1.5s infinite;
+        }
+        
+        .voice-button.error {
+            background-color: #f44336;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="logo">Salonova</div>
+        <div class="nav-links">
+            <a href="select_salon.html">Book</a>
+            <a href="contact.html">Contact Us</a>
+            <a href="help.html">Help</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <h1>Book Your Appointment</h1>
+       
+        <button id="startButton" class="voice-button">Start Voice Assistant</button>
+        <div id="status" class="status"></div>
+        <div id="conversationLog" class="conversation-log"></div>
+        
+        <form id="bookingForm" style="display: block;">
+            <div class="form-group">
+                <label for="name">Name:</label>
+                <input type="text" id="name" required>
+            </div>
+            <div class="form-group">
+                <label for="salon">Select Salon:</label>
+                <select id="salon" required>
+                    <option value="">Choose a salon</option>
+                    <option value="Elegant Cuts">Elegant Cuts</option>
+                    <option value="Style Studio">Style Studio</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="service">Select Service:</label>
+                <select id="service" required>
+                    <option value="">Choose a service</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="datetime">Appointment Date & Time:</label>
+                <input type="datetime-local" id="datetime" required>
+            </div>
+            <button type="submit" class="voice-button">Book Appointment</button>
+        </form>
+    </div>
+
+    <script>
+        let recognition;
+        let conversationState = 'initial';
+        let bookingData = {
+            name: '',
+            salon: '',
+            service: '',
+            dateTime: ''
+        };
+
+        let isSpeaking = false;
+        let shouldStartListening = false;
+        let isFirstInteraction = true;
+
+        // Service options for each salon
+        const salonServices = {
+            'Elegant Cuts': ['Haircut', 'Color Treatment'],
+            'Style Studio': ['Manicure', 'Pedicure']
+        };
+
+        function initializeSpeechRecognition() {
+            if (recognition) {
+                recognition.abort();
+            }
+            recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+            recognition.continuous = false;
+            recognition.interimResults = false;
+            recognition.lang = 'en-US';
+
+            recognition.onstart = function() {
+                updateButtonState('listening');
+            };
+
+            recognition.onresult = function(event) {
+                const userInput = event.results[0][0].transcript.toLowerCase();
+                addToConversation('You: ' + userInput, 'user-message');
+                processUserInput(userInput);
+            };
+
+            recognition.onerror = function(event) {
+                console.error('Speech recognition error:', event.error);
+                updateStatus('Error occurred. Please try again.', 'error');
+                stopListening();
+                updateButtonState('error');
+                // Attempt to restart listening after error
+                setTimeout(() => {
+                    if (shouldStartListening) {
+                        startListening();
+                    }
+                }, 1000);
+            };
+
+            recognition.onend = function() {
+                if (shouldStartListening && !isSpeaking) {
+                    setTimeout(() => {
+                        if (shouldStartListening && !isSpeaking) {
+                            startListening();
+                        }
+                    }, 1000);
+                } else {
+                    updateButtonState('start');
+                }
+            };
+        }
+
+        function updateButtonState(state) {
+            const button = document.getElementById('startButton');
+            button.classList.remove('listening', 'speaking', 'error');
+            
+            switch(state) {
+                case 'listening':
+                    button.textContent = 'Listening... (Click to Stop)';
+                    button.classList.add('listening');
+                    break;
+                case 'speaking':
+                    button.textContent = 'Speaking... (Click to Stop)';
+                    button.classList.add('speaking');
+                    break;
+                case 'error':
+                    button.textContent = 'Click to Try Again';
+                    button.classList.add('error');
+                    break;
+                case 'completed':
+                    button.textContent = 'Start New Booking';
+                    shouldStartListening = false;
+                    break;
+                default:
+                    button.textContent = isFirstInteraction ? 'Start Voice Assistant' : 'Click to Continue';
+            }
+        }
+
+        function startListening() {
+            if (!recognition) {
+                initializeSpeechRecognition();
+            }
+            
+            try {
+                if (!isSpeaking) {
+                    shouldStartListening = true;
+                    recognition.start();
+                }
+            } catch (error) {
+                console.error('Error starting recognition:', error);
+                initializeSpeechRecognition();
+                setTimeout(() => {
+                    if (shouldStartListening && !isSpeaking) {
+                        recognition.start();
+                    }
+                }, 100);
+            }
+        }
+
+        function stopListening() {
+            try {
+                recognition.stop();
+            } catch (error) {
+                console.error('Error stopping recognition:', error);
+            }
+            shouldStartListening = false;
+            updateButtonState('start');
+        }
+
+        async function processUserInput(input) {
+            stopListening();
+            
+            try {
+                switch(conversationState) {
+                    case 'initial':
+                        if (input.includes('book') && input.includes('appointment')) {
+                            conversationState = 'getName';
+                            await speak("Sure! I'll help you book an appointment. What's your name?");
+                        } else {
+                            await speak("I can help you book an appointment. Just say 'book appointment' to get started.");
+                        }
+                        break;
+
+                    case 'getName':
+                        if (input.length > 0 && !input.includes('book appointment')) {
+                            bookingData.name = input;
+                            conversationState = 'getSalon';
+                            await speak("Thanks " + input + "! Which salon would you like to book? We have Elegant Cuts and Style Studio.");
+                        } else {
+                            await speak("I didn't catch your name. Could you please say it again?");
+                        }
+                        break;
+
+                    case 'getSalon':
+                        const salonName = findSalonMatch(input);
+                        if (salonName) {
+                            bookingData.salon = salonName;
+                            updateSalonServices(salonName);
+                            conversationState = 'getService';
+                            await speak(`What service would you like at ${salonName}? Available services are: ${salonServices[salonName].join(', ')}`);
+                        } else {
+                            await speak("I didn't catch that. Please choose either Elegant Cuts or Style Studio.");
+                        }
+                        break;
+
+                    case 'getService':
+                        const service = findServiceMatch(input, bookingData.salon);
+                        if (service) {
+                            bookingData.service = service;
+                            conversationState = 'getDateTime';
+                            await speak("When would you like to book your appointment? Please use 24-hour format, for example: 'tomorrow at 14:00' or 'next Monday at 10:00'.");
+                        } else {
+                            await speak(`Please choose from these services: ${salonServices[bookingData.salon].join(', ')}`);
+                        }
+                        break;
+
+                    case 'getDateTime':
+                        const dateTime = parseDateTimeFromSpeech(input);
+                        if (dateTime) {
+                            const parsedDate = new Date(dateTime);
+                            const timeStr = parsedDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+                            const dateStr = parsedDate.toLocaleDateString(undefined, { 
+                                weekday: 'long',
+                                year: 'numeric',
+                                month: 'long',
+                                day: 'numeric'
+                            });
+                            
+                            bookingData.dateTime = dateTime;
+                            try {
+                                console.log('Checking availability for:', bookingData);
+                                const response = await checkAvailability(bookingData);
+                                console.log('Availability response:', response);
+                                
+                                if (response.available) {
+                                    await speak(`I'll book your appointment for ${dateStr} at ${timeStr}. Please confirm by saying yes.`);
+                                    conversationState = 'confirmBooking';
+                                } else {
+                                    if (response.next_available_slot) {
+                                        try {
+                                            const nextSlot = new Date(response.next_available_slot);
+                                            if (!isNaN(nextSlot.getTime())) {
+                                                const nextTimeStr = nextSlot.toLocaleTimeString([], { 
+                                                    hour: '2-digit', 
+                                                    minute: '2-digit', 
+                                                    hour12: false 
+                                                });
+                                                const nextDateStr = nextSlot.toLocaleDateString(undefined, {
+                                                    weekday: 'long',
+                                                    year: 'numeric',
+                                                    month: 'long',
+                                                    day: 'numeric'
+                                                });
+                                                await speak(`I'm sorry, that time is not available. The next available slot is on ${nextDateStr} at ${nextTimeStr}. Would you like to book this slot instead?`);
+                                                conversationState = 'confirmAlternative';
+                                                bookingData.dateTime = response.next_available_slot;
+                                            } else {
+                                                throw new Error('Invalid next available slot date');
+                                            }
+                                        } catch (error) {
+                                            console.error('Error formatting next available slot:', error);
+                                            await speak("I'm sorry, that time slot is not available. Would you like to try a different time?");
+                                            conversationState = 'getDateTime';
+                                        }
+                                    } else {
+                                        await speak("I'm sorry, that time slot is not available and I couldn't find any available slots soon. Would you like to try a different time?");
+                                        conversationState = 'getDateTime';
+                                    }
+                                }
+                            } catch (error) {
+                                console.error('Availability check error:', error);
+                                await speak("I'm sorry, there was an error checking availability. Please try again.");
+                                conversationState = 'getDateTime';
+                            }
+                        } else {
+                            await speak("I didn't understand the date and time. Please use 24-hour format:\n" +
+                                      "- Say a specific date like 'January 25th at 14:30' or '25th January at 14:30'\n" +
+                                      "- Use date format like '25/01 at 14:30' or '01/25 at 14:30'\n" +
+                                      "- Say relative dates like 'today at 14:30' or 'tomorrow at 15:00'\n" +
+                                      "- Use day names like 'next Monday at 10:30'\n" +
+                                      "Remember to use 24-hour format (00:00 to 23:59). What date and time would you like?");
+                        }
+                        break;
+
+                    case 'confirmBooking':
+                        if (input.includes('yes') || input.includes('sure') || input.includes('confirm')) {
+                            try {
+                                const bookingResult = await makeBooking(bookingData);
+                                
+                                if (bookingResult.status === 'success') {
+                                    await speak("Great! Your appointment has been booked successfully.");
+                                    conversationState = 'completed';
+                                    updateButtonState('completed');
+                                } else if (bookingResult.status === 'slot_unavailable' && bookingResult.next_available_slot) {
+                                    const nextSlot = new Date(bookingResult.next_available_slot);
+                                    const formatted = formatDateTime(nextSlot);
+                                    
+                                    if (formatted) {
+                                        await speak(`I'm sorry, that slot was just taken. The next available slot is on ${formatted.dateStr} at ${formatted.timeStr}. Would you like to book this slot instead?`);
+                                        conversationState = 'confirmAlternative';
+                                        bookingData.dateTime = bookingResult.next_available_slot;
+                                    } else {
+                                        await speak("I'm sorry, that slot is no longer available. Would you like to try a different time?");
+                                        conversationState = 'getDateTime';
+                                    }
+                                } else {
+                                    await speak("I'm sorry, that slot is no longer available. Would you like to try a different time?");
+                                    conversationState = 'getDateTime';
+                                }
+                            } catch (error) {
+                                console.error('Booking error:', error);
+                                await speak("I'm sorry, there was an error with the booking system. Would you like to try a different time?");
+                                conversationState = 'getDateTime';
+                            }
+                        } else {
+                            await speak("Would you like to try a different time?");
+                            conversationState = 'getDateTime';
+                        }
+                        break;
+
+                    case 'confirmAlternative':
+                        if (input.includes('yes') || input.includes('sure')) {
+                            try {
+                                const bookingResult = await makeBooking(bookingData);
+                                
+                                if (bookingResult.status === 'success') {
+                                    await speak("Perfect! Your appointment has been booked successfully.");
+                                    conversationState = 'completed';
+                                    updateButtonState('completed');
+                                } else if (bookingResult.status === 'slot_unavailable' && bookingResult.next_available_slot) {
+                                    const nextSlot = new Date(bookingResult.next_available_slot);
+                                    const formatted = formatDateTime(nextSlot);
+                                    
+                                    if (formatted) {
+                                        await speak(`I'm sorry, that slot was also just taken. The next available slot is on ${formatted.dateStr} at ${formatted.timeStr}. Would you like to book this slot instead?`);
+                                        bookingData.dateTime = bookingResult.next_available_slot;
+                                    } else {
+                                        await speak("I'm sorry, that slot is no longer available. Would you like to try a different time?");
+                                        conversationState = 'getDateTime';
+                                    }
+                                } else {
+                                    await speak("I'm sorry, that slot is no longer available. Would you like to try a different time?");
+                                    conversationState = 'getDateTime';
+                                }
+                            } catch (error) {
+                                console.error('Booking error:', error);
+                                await speak("I'm sorry, there was an error with the booking system. Would you like to try a different time?");
+                                conversationState = 'getDateTime';
+                            }
+                        } else {
+                            await speak("Would you like to try a different time?");
+                            conversationState = 'getDateTime';
+                        }
+                        break;
+                }
+
+                // Start listening again after speaking (except when completed)
+                if (conversationState !== 'completed') {
+                    shouldStartListening = true;
+                    // Wait for a short delay before starting to listen again
+                    setTimeout(() => {
+                        if (shouldStartListening && !isSpeaking) {
+                            startListening();
+                        }
+                    }, 1000);
+                }
+            } catch (error) {
+                console.error('Error in processUserInput:', error);
+                await speak("I'm sorry, there was an error. Please try again.");
+                shouldStartListening = true;
+                setTimeout(() => {
+                    if (shouldStartListening && !isSpeaking) {
+                        startListening();
+                    }
+                }, 1000);
+            }
+        }
+
+        function findSalonMatch(input) {
+            input = input.toLowerCase();
+            if (input.includes('elegant') || input.includes('cuts')) return 'Elegant Cuts';
+            if (input.includes('style') || input.includes('studio')) return 'Style Studio';
+            return null;
+        }
+
+        function findServiceMatch(input, salon) {
+            input = input.toLowerCase();
+            return salonServices[salon].find(service => 
+                input.includes(service.toLowerCase())
+            );
+        }
+
+        function parseDateTimeFromSpeech(input) {
+            input = input.toLowerCase().trim();
+            console.log('Parsing datetime from:', input);
+            
+            const now = new Date();
+            let targetDate = new Date(now);
+            let dayFound = false;
+            let timeFound = false;
+
+            // Handle specific dates first
+            // Format: "January 25" or "25th January" or "25 January" or "January 25th"
+            const months = ['january', 'february', 'march', 'april', 'may', 'june', 
+                          'july', 'august', 'september', 'october', 'november', 'december'];
+            
+            // Remove ordinal indicators (1st, 2nd, 3rd, 4th, etc.)
+            input = input.replace(/(st|nd|rd|th)/g, '');
+            
+            // Try different date formats
+            let dateMatch = null;
+            
+            // Match "January 25" format
+            for (let i = 0; i < months.length; i++) {
+                const monthRegex = new RegExp(`${months[i]}\\s+(\\d{1,2})`, 'i');
+                const match = input.match(monthRegex);
+                if (match) {
+                    const day = parseInt(match[1]);
+                    if (day >= 1 && day <= 31) {
+                        targetDate.setMonth(i);
+                        targetDate.setDate(day);
+                        dayFound = true;
+                        break;
+                    }
+                }
+            }
+
+            // Match "25 January" format
+            if (!dayFound) {
+                for (let i = 0; i < months.length; i++) {
+                    const monthRegex = new RegExp(`(\\d{1,2})\\s+${months[i]}`, 'i');
+                    const match = input.match(monthRegex);
+                    if (match) {
+                        const day = parseInt(match[1]);
+                        if (day >= 1 && day <= 31) {
+                            targetDate.setMonth(i);
+                            targetDate.setDate(day);
+                            dayFound = true;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // Match DD/MM or MM/DD format
+            if (!dayFound) {
+                const dateRegex = /(\d{1,2})[/-](\d{1,2})(?:[/-](\d{4}|\d{2}))?/;
+                const match = input.match(dateRegex);
+                if (match) {
+                    let first = parseInt(match[1]);
+                    let second = parseInt(match[2]);
+                    let year = match[3] ? parseInt(match[3]) : targetDate.getFullYear();
+                    
+                    // If year is in YY format, convert to YYYY
+                    if (year < 100) {
+                        year += year < 50 ? 2000 : 1900;
+                    }
+
+                    // Try to determine if it's MM/DD or DD/MM
+                    if (first <= 12 && second <= 31) {
+                        // Assume MM/DD format
+                        targetDate.setFullYear(year, first - 1, second);
+                    } else if (second <= 12 && first <= 31) {
+                        // Assume DD/MM format
+                        targetDate.setFullYear(year, second - 1, first);
+                    }
+                    dayFound = true;
+                }
+            }
+
+            // If no specific date found, try relative dates
+            if (!dayFound) {
+                const days = {
+                    'today': 0,
+                    'tomorrow': 1,
+                    'day after tomorrow': 2,
+                    'next week': 7
+                };
+                
+                for (const [phrase, daysToAdd] of Object.entries(days)) {
+                    if (input.includes(phrase)) {
+                        targetDate.setDate(now.getDate() + daysToAdd);
+                        dayFound = true;
+                        break;
+                    }
+                }
+            }
+
+            // Handle weekdays if no other date format was found
+            if (!dayFound) {
+                const weekdays = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+                for (let i = 0; i < weekdays.length; i++) {
+                    if (input.includes(weekdays[i])) {
+                        const targetDay = i;
+                        const currentDay = now.getDay();
+                        let daysToAdd = targetDay - currentDay;
+                        if (daysToAdd <= 0) daysToAdd += 7;
+                        targetDate.setDate(now.getDate() + daysToAdd);
+                        dayFound = true;
+                        break;
+                    }
+                }
+            }
+
+            // Extract time - try 24-hour format
+            let timeMatch = input.match(/(\d{1,2})(?::(\d{2}))?\s*(?:hours|h|:00|o'clock)?/i);
+            
+            if (timeMatch) {
+                let hours = parseInt(timeMatch[1]);
+                let minutes = timeMatch[2] ? parseInt(timeMatch[2]) : 0;
+                
+                // Validate hours and minutes
+                if (hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59) {
+                    // Create a new date object to avoid timezone issues
+                    const localDate = new Date(
+                        targetDate.getFullYear(),
+                        targetDate.getMonth(),
+                        targetDate.getDate(),
+                        hours,
+                        minutes,
+                        0,
+                        0
+                    );
+
+                    // Check if the date/time is in the past
+                    if (localDate < now) {
+                        if (!dayFound) {
+                            // If only time was specified and it's in the past, move to tomorrow
+                            localDate.setDate(localDate.getDate() + 1);
+                        } else {
+                            // If a specific date was given but it's in the past, return null
+                            return null;
+                        }
+                    }
+
+                    timeFound = true;
+                    console.log('Input time:', `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`);
+                    console.log('Final local datetime:', localDate.toString());
+                    
+                    // Format the date in ISO format but preserve the exact time
+                    const isoString = localDate.toISOString();
+                    console.log('ISO datetime to send:', isoString);
+                    return isoString;
+                }
+            }
+
+            if (!timeFound) {
+                console.log('No valid time found in input');
+                return null;
+            }
+            return null;
+        }
+
+        async function checkAvailability(bookingData) {
+            try {
+                console.log('Checking availability for:', bookingData);
+                const response = await fetch('/api/check-availability', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(bookingData)
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    console.error('Availability check failed:', errorData);
+                    throw new Error(errorData.detail || 'Failed to check availability');
+                }
+
+                const result = await response.json();
+                console.log('Availability response:', result);
+
+                // If the slot is not available, make sure we handle the next available slot
+                if (!result.available) {
+                    // Parse the next available slot string into a proper Date object
+                    let nextSlot = null;
+                    if (result.nextAvailable) {
+                        try {
+                            // Handle different date formats
+                            if (result.nextAvailable.includes('IST')) {
+                                // Parse IST format (e.g. "2025-05-26 14:00 IST")
+                                const [datePart, timePart] = result.nextAvailable.split(' ');
+                                const [year, month, day] = datePart.split('-').map(Number);
+                                const [hours, minutes] = timePart.split(':').map(Number);
+                                nextSlot = new Date(year, month - 1, day, hours, minutes);
+                            } else if (result.nextAvailable.includes('T')) {
+                                // Parse ISO format
+                                nextSlot = new Date(result.nextAvailable);
+                            } else {
+                                // Parse simple datetime format
+                                nextSlot = new Date(result.nextAvailable);
+                            }
+
+                            // Validate the parsed date
+                            if (isNaN(nextSlot.getTime())) {
+                                console.error('Invalid next available slot date:', result.nextAvailable);
+                                nextSlot = null;
+                            }
+                        } catch (error) {
+                            console.error('Error parsing next available slot:', error);
+                            nextSlot = null;
+                        }
+                    }
+
+                    return {
+                        available: false,
+                        status: 'slot_unavailable',
+                        next_available_slot: nextSlot ? nextSlot.toISOString() : null,
+                        message: result.message || "Time slot not available"
+                    };
+                }
+
+                return result;
+            } catch (error) {
+                console.error('Error checking availability:', error);
+                throw error;
+            }
+        }
+
+        async function makeBooking(bookingData) {
+            try {
+                console.log('Sending booking request:', bookingData);
+                const response = await fetch('/api/book-appointment', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(bookingData)
+                });
+
+                const result = await response.json();
+                console.log('Booking response:', result);
+
+                // Check if the slot is unavailable or there's a conflict
+                if (result.status === 'slot_unavailable' || result.status === 'error') {
+                    let nextAvailableSlot = null;
+                    
+                    // Parse the next available slot if it exists
+                    if (result.next_available_slot || result.nextAvailable) {
+                        const nextSlotStr = result.next_available_slot || result.nextAvailable;
+                        try {
+                            // Handle different date formats
+                            if (nextSlotStr.includes('IST')) {
+                                // Parse IST format (e.g. "2025-05-26 14:00 IST")
+                                const [datePart, timePart] = nextSlotStr.split(' ');
+                                const [year, month, day] = datePart.split('-').map(Number);
+                                const [hours, minutes] = timePart.split(':').map(Number);
+                                nextAvailableSlot = new Date(year, month - 1, day, hours, minutes);
+                            } else if (nextSlotStr.includes('T')) {
+                                // Parse ISO format
+                                nextAvailableSlot = new Date(nextSlotStr);
+                            } else {
+                                // Parse simple datetime format
+                                nextAvailableSlot = new Date(nextSlotStr);
+                            }
+
+                            // Validate the parsed date
+                            if (isNaN(nextAvailableSlot.getTime())) {
+                                console.error('Invalid next available slot date:', nextSlotStr);
+                                nextAvailableSlot = null;
+                            }
+                        } catch (error) {
+                            console.error('Error parsing next available slot:', error);
+                            nextAvailableSlot = null;
+                        }
+                    }
+
+                    return {
+                        status: 'slot_unavailable',
+                        next_available_slot: nextAvailableSlot ? nextAvailableSlot.toISOString() : null,
+                        message: result.message || "Slot is no longer available"
+                    };
+                }
+
+                return {
+                    status: 'success',
+                    message: "Appointment booked successfully",
+                    appointment_details: result
+                };
+            } catch (error) {
+                console.error('Error making booking:', error);
+                throw error;
+            }
+        }
+
+        function formatDateTime(date) {
+            if (!date || isNaN(date.getTime())) {
+                console.error('Invalid date object:', date);
+                return null;
+            }
+
+            try {
+                const timeStr = date.toLocaleTimeString([], { 
+                    hour: '2-digit', 
+                    minute: '2-digit', 
+                    hour12: false 
+                });
+                const dateStr = date.toLocaleDateString(undefined, {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                });
+                return { timeStr, dateStr };
+            } catch (error) {
+                console.error('Error formatting date:', error);
+                return null;
+            }
+        }
+
+        async function speak(text) {
+            return new Promise((resolve) => {
+                try {
+                    isSpeaking = true;
+                    updateButtonState('speaking');
+                    addToConversation('Assistant: ' + text, 'assistant-message');
+                    
+                    const utterance = new SpeechSynthesisUtterance(text);
+                    
+                    utterance.onend = function() {
+                        isSpeaking = false;
+                        updateButtonState(shouldStartListening ? 'listening' : 'start');
+                        resolve();
+                    };
+
+                    utterance.onerror = function(event) {
+                        console.error('Speech synthesis error:', event);
+                        isSpeaking = false;
+                        updateButtonState('error');
+                        resolve();
+                    };
+
+                    window.speechSynthesis.speak(utterance);
+                } catch (error) {
+                    console.error('Error in speak function:', error);
+                    isSpeaking = false;
+                    updateButtonState('error');
+                    resolve();
+                }
+            });
+        }
+
+        function addToConversation(message, className) {
+            const conversationLog = document.getElementById('conversationLog');
+            const messageElement = document.createElement('div');
+            messageElement.className = `message ${className}`;
+            messageElement.textContent = message;
+            conversationLog.appendChild(messageElement);
+            conversationLog.scrollTop = conversationLog.scrollHeight;
+        }
+
+        function updateStatus(message, type) {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = `status ${type}`;
+            status.style.display = 'block';
+        }
+
+        function updateSalonServices(salon) {
+            const serviceSelect = document.getElementById('service');
+            serviceSelect.innerHTML = '<option value="">Choose a service</option>';
+            salonServices[salon].forEach(service => {
+                const option = document.createElement('option');
+                option.value = service;
+                option.textContent = service;
+                serviceSelect.appendChild(option);
+            });
+        }
+
+        // Event Listeners
+        document.getElementById('startButton').addEventListener('click', async function() {
+            if (isSpeaking) {
+                window.speechSynthesis.cancel();
+                isSpeaking = false;
+            }
+
+            if (recognition && recognition.state === 'listening') {
+                stopListening();
+                return;
+            }
+
+            if (conversationState === 'completed') {
+                conversationState = 'initial';
+                bookingData = {
+                    name: '',
+                    salon: '',
+                    service: '',
+                    dateTime: ''
+                };
+                document.getElementById('conversationLog').innerHTML = '';
+                isFirstInteraction = true;
+            }
+
+            if (isFirstInteraction) {
+                isFirstInteraction = false;
+                shouldStartListening = true;
+                await speak("Hello! How can I help you today?");
+                startListening();
+            } else {
+                shouldStartListening = true;
+                startListening();
+            }
+        });
+
+        // Handle salon selection change
+        document.getElementById('salon').addEventListener('change', function() {
+            if (this.value) {
+                updateSalonServices(this.value);
+            }
+        });
+
+        // Cleanup
+        window.addEventListener('beforeunload', function() {
+            if (recognition) {
+                recognition.abort();
+            }
+            window.speechSynthesis.cancel();
+        });
+
+        // Handle visibility change
+        document.addEventListener('visibilitychange', function() {
+            if (document.hidden) {
+                if (recognition) {
+                    recognition.abort();
+                }
+                window.speechSynthesis.cancel();
+                isSpeaking = false;
+                shouldStartListening = false;
+            }
+        });
+    </script>
+</body>
+</html>
+

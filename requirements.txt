@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+motor
+pydantic
+pytz
+python-dateutil
+SpeechRecognition
+openai
+langchain
+pyaudio
+pymongo
