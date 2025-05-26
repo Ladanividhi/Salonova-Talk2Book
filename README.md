@@ -85,12 +85,6 @@ The system comes pre-loaded with two sample salons:
 
 ---
 
-## 🎬 Demo Video
-
-Watch the demo of **Salonova: Talk2Book** in action on YouTube:
-
-click here: [Demo Video on YouTube](https://youtu.be/jTRF2rQfHMs?feature=shared)
-
 ## 🛠️Troubleshooting
 
 - ✅Make sure your microphone is properly connected and has necessary permissions
@@ -99,6 +93,15 @@ click here: [Demo Video on YouTube](https://youtu.be/jTRF2rQfHMs?feature=shared)
 - ✅If you encounter any issues with speech recognition, try speaking clearly and in a quiet environment
 
 ---
+
+## 🎬 Demo Video
+
+Watch the demo of **Salonova: Talk2Book** in action on YouTube:
+
+click here: [Demo Video on YouTube](https://youtu.be/jTRF2rQfHMs?feature=shared)
+
+---
+
 
 ## 🙌 Final Thoughts
 
