@@ -83,6 +83,14 @@ The system comes pre-loaded with two sample salons:
    - Services: Manicure, Pedicure
    - Hours: 10:00 AM - 7:00 PM
 
+---
+
+## 🎬 Demo Video
+
+Watch the demo of **Salonova: Talk2Book** in action on YouTube:
+
+click here: [Demo Video on YouTube](https://youtu.be/jTRF2rQfHMs?feature=shared)
+
 ## 🛠️Troubleshooting
 
 - ✅Make sure your microphone is properly connected and has necessary permissions
